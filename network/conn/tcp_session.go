@@ -1,25 +1,17 @@
-package network
+package conn
 
 import (
-	"net"
-
 	"errors"
+	"net"
 )
-
-type Session interface {
-	SetRawConn(conn interface{})
-
-	Send(data []byte) error
-	Recv() ([]byte, error)
-	Close() error
-}
 
 type TcpSession struct {
 	conn       net.TCPConn
-	sessionId  uint32 //会话id
-	localAddr  string //本端地址
-	remoteAddr string //对端地址
+	sessionId  uint32   //会话id
+	localAddr  net.Addr //本端地址
+	remoteAddr net.Addr //对端地址
 
+	recvChan chan interface{} //接收数据的放置通道
 }
 
 func (self *TcpSession) Send(data []byte) error {
@@ -27,10 +19,10 @@ func (self *TcpSession) Send(data []byte) error {
 	return nil
 }
 
-func (self *TcpSession) Recv() ([]byte, error) {
-
-	return nil, nil
-}
+//func (self *TcpSession) Recv() ([]byte, error) {
+//
+//	return nil, nil
+//}
 
 func (self *TcpSession) Close() error {
 
@@ -45,4 +37,13 @@ func (self *TcpSession) SetRawConn(conn interface{}) error {
 	}
 
 	return errors.New("set raw conn in TcpSession failed | invalid param.")
+}
+
+func (self *TcpSession) SetRecvChan(chan interface{}) error {
+
+}
+
+func (self *TcpSession) Start() error {
+
+	return nil
 }
