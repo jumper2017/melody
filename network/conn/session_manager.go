@@ -26,6 +26,8 @@ type SessionManager struct {
 // 同 DelSession 参数含义， 返回可能是一个或多个Session
 //CloseSession(sessionID string) error //同 DelSession 参数含义
 
+//session 需要在　client/server　两端进行接口的统一，　因为某些逻辑在 client/server两端是存在差异的，　因此在session内部应该知道自己
+//是服务端还是客户端
 func NewSession(conn interface{}, recvChan chan interface{}) (interf.Session, error) {
 
 	var session interf.Session
