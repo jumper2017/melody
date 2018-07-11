@@ -6,9 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jumper2017/melody/network/interf"
 	"net"
+
 	"github.com/gorilla/websocket"
+	"github.com/jumper2017/melody/network/interf"
 )
 
 type SessionManager struct {
@@ -24,6 +25,30 @@ type SessionManager struct {
 // "tpc:localip:localport:remoteip:remoteport/*" 表示删除 tpc:localip:localport:remoteip:remoteport 的所有元素
 // 同 DelSession 参数含义， 返回可能是一个或多个Session
 //CloseSession(sessionID string) error //同 DelSession 参数含义
+
+func NewSession(conn interface{}, recvChan chan interface{}) (interf.Session, error) {
+
+	var session interf.Session
+	var err error
+	switch t := conn.(type) {
+	case net.TCPConn:
+		session, err = NewTcpSession(t, recvChan)
+		break
+
+	case net.UDPConn:
+		session, err = NewUdpSession(t, recvChan)
+		break
+
+	case websocket.Conn:
+		session, err = NewWsSession(t, recvChan)
+		break
+	default:
+		session, err = nil, nil
+		break
+	}
+
+	return session, err
+}
 
 func (self *SessionManager) AddSession(sessionType string, s interf.Session) error {
 
@@ -89,22 +114,4 @@ func (self *SessionManager) GetSession(sessionID string) ([]interf.Session, erro
 	}
 
 	return nil, errors.New("get session failed | invalid param.")
-}
-
-func NewSession(conn interface{}, recvChan chan interface{}) (interf.Session, error){
-
-
-	switch t := conn.(type) {
-	case net.TCPConn:
-		session, err := NewTcpSession(t, recvChan)
-		var tt interf.Session
-		return session, err
-
-	case net.UDPConn:
-		break
-
-	case websocket.Conn:
-		break
-	}
-
 }
