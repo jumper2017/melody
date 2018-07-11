@@ -1,8 +1,8 @@
 package interf
 
 type Session interface {
-	SetRawConn(conn interface{}) error
-	SetRecvChan(chan interface{}) error
+	//SetRawConn(conn interface{}) error
+	//SetRecvChan(chan interface{}) error
 	Start() error
 
 	Send(data []byte) error
