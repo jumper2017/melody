@@ -2,6 +2,7 @@ package conn
 
 import (
 	"fmt"
+	"io"
 	"net"
 )
 
@@ -33,6 +34,29 @@ func NewTcpSession(sessionType SessionType, conn net.TCPConn, recvChan chan inte
 
 func (self *TcpSession) Start() error {
 
+	for {
+
+		data := make([]byte, STREAM_MSG_HEAD_LENGTH)
+		n, err := io.ReadFull(&self.conn, data)
+		if err != nil || n != STREAM_MSG_HEAD_LENGTH {
+			//todo: 错误处理
+
+		}
+
+		//转换为长度
+
+		var length int
+		data = make([]byte, length)
+		n, err = io.ReadFull(&self.conn, data)
+		if err != nil || n != STREAM_MSG_HEAD_LENGTH {
+			//todo: 错误处理
+
+		}
+
+		//将数据转到上层
+		self.recvChan <- data
+
+	}
 	return nil
 }
 
