@@ -1,8 +1,10 @@
 package conn
 
 import (
-	"fmt"
+	"errors"
 	"net"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 type UdpSession struct {
@@ -14,22 +16,34 @@ type UdpSession struct {
 
 	recvChan chan interface{} //接收数据的放置通道
 
+	CbCleanSession func([]string) error //关闭链接的回调函数，　由上层sessionManager进行操作
 }
 
-func NewUdpSession(sessionType SessionType, conn net.UDPConn, recvChan chan interface{}) (*UdpSession, error) {
+func NewUdpSession(sessionId string, sessionType SessionType, conn net.UDPConn, recvChan chan interface{}) (*UdpSession, error) {
 
 	laddr := conn.LocalAddr()
 	raddr := conn.RemoteAddr()
 	udpSession := &UdpSession{
+		sessionId:   sessionId,
+		sessionType: sessionType,
 		conn:        conn,
 		localAddr:   laddr,
 		remoteAddr:  raddr,
 		recvChan:    recvChan,
-		sessionType: sessionType,
-		sessionId:   fmt.Sprintf("%s:%s:%s", "tcp", laddr.String(), raddr.String()),
 	}
 
 	return udpSession, nil
+}
+
+func (self *UdpSession) SetCbCleanSession(CbCleanSession func([]string) error) error {
+	if CbCleanSession != nil {
+		log.Errorf("set cb clean session failed, invalid param.")
+		return errors.New("set cb clean session failed, invalid param.")
+	}
+
+	self.CbCleanSession = CbCleanSession
+	return nil
+
 }
 
 func (self *UdpSession) Start() error {
@@ -41,11 +55,6 @@ func (self *UdpSession) Send(data []byte) error {
 
 	return nil
 }
-
-//func (self *UdpSession) Recv() ([]byte, error) {
-//
-//	return nil, nil
-//}
 
 func (self *UdpSession) Close() error {
 

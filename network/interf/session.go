@@ -5,6 +5,8 @@ type Session interface {
 	//SetRecvChan(chan interface{}) error
 	Start() error
 
+	SetCbCleanSession(func([]string) error) error
+
 	Send(data []byte) error
 	//Recv() ([]byte, error)
 	Close() error
