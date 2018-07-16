@@ -48,11 +48,29 @@ func (self *UdpSession) SetCbCleanSession(CbCleanSession func([]string) error) e
 
 func (self *UdpSession) Start() error {
 
+	for {
+		self.conn.Read()
+	}
 	return nil
 }
 
 func (self *UdpSession) Send(data []byte) error {
 
+	for {
+
+		n, err := self.conn.Write(data)
+		if err != nil {
+			log.Errorf("send data failed, err: %v", err)
+			return err
+		}
+
+		if n == len(data) {
+			break
+		}
+
+		data = data[n:]
+
+	}
 	return nil
 }
 
