@@ -14,17 +14,16 @@ type UdpSession struct {
 	localAddr   net.Addr    //本端地址
 	remoteAddr  net.Addr    //对端地址
 
-	recvChan chan interface{} //接收数据的放置通道
+	recvChan chan []byte //接收数据的放置通道
 
 	CbCleanSession func([]string) error //关闭链接的回调函数，　由上层sessionManager进行操作
 }
 
-func NewUdpSession(sessionId string, sessionType SessionType, conn net.UDPConn, recvChan chan interface{}) (*UdpSession, error) {
+func NewUdpSession(sessionType SessionType, conn net.UDPConn, recvChan chan []byte) (*UdpSession, error) {
 
 	laddr := conn.LocalAddr()
 	raddr := conn.RemoteAddr()
 	udpSession := &UdpSession{
-		sessionId:   sessionId,
 		sessionType: sessionType,
 		conn:        conn,
 		localAddr:   laddr,
@@ -81,4 +80,10 @@ func (self *UdpSession) Close() error {
 
 func (self *UdpSession) GetSessionId() string {
 	return self.sessionId
+}
+
+func (self *UdpSession) SetSessionId(sessionId string) {
+	self.sessionId = sessionId
+	self.needToCleanSessionsId = []string{sessionId}
+	return
 }

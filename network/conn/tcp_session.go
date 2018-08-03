@@ -4,57 +4,36 @@ import (
 	"io"
 	"net"
 
-	"errors"
-
 	"sync/atomic"
+
+	"encoding/binary"
 
 	log "github.com/Sirupsen/logrus"
 )
 
 type TcpSession struct {
-	conn        net.TCPConn
-	sessionId   string      //会话id
-	sessionType SessionType //服务端还是客户端
-	localAddr   net.Addr    //本端地址
-	remoteAddr  net.Addr    //对端地址
-
-	recvChan chan interface{} //接收数据的放置通道
-
-	CbCleanSession func([]string) error //关闭链接的回调函数，　由上层sessionManager进行操作
-
-	//todo: 根据业务需求进行设置，　默认在创建时设置为自身sessionId
-	needToCleanSessionsId []string
-
-	closeTag int32 //关闭标记，　防止主动关闭时调用两次　Close
+	conn     net.TCPConn
+	recvChan chan []byte //接收数据的放置通道
+	BaseSession
 }
 
-func NewTcpSession(sessionId string, sessionType SessionType, conn net.TCPConn, recvChan chan interface{}) (*TcpSession, error) {
+func NewTcpSession(sessionType SessionType, conn net.TCPConn, recvChan chan []byte) (*TcpSession, error) {
 
 	laddr := conn.LocalAddr()
 	raddr := conn.RemoteAddr()
 	tcpSession := &TcpSession{
-		sessionId:             sessionId,
-		sessionType:           sessionType,
-		conn:                  conn,
-		localAddr:             laddr,
-		remoteAddr:            raddr,
-		recvChan:              recvChan,
-		closeTag:              0,
-		needToCleanSessionsId: []string{sessionId},
+
+		BaseSession: BaseSession{
+			sessionType: sessionType,
+			localAddr:   laddr,
+			remoteAddr:  raddr,
+			closeTag:    0,
+		},
+		conn:     conn,
+		recvChan: recvChan,
 	}
 
 	return tcpSession, nil
-}
-
-func (self *TcpSession) SetCbCleanSession(CbCleanSession func([]string) error) error {
-	if CbCleanSession != nil {
-		log.Errorf("set cb clean session failed, invalid param.")
-		return errors.New("set cb clean session failed, invalid param.")
-	}
-
-	self.CbCleanSession = CbCleanSession
-	return nil
-
 }
 
 func (self *TcpSession) Start() error {
@@ -69,26 +48,28 @@ func (self *TcpSession) Start() error {
 			return nil
 		}
 
-		if err == io.EOF {
+		switch {
+
+		case err == io.EOF:
 			log.Debugf("recv eof from remote.")
-			self.CbCleanSession(self.needToCleanSessionsId)
+			self.CbCleanSession(self.needToCleanSessionsId, false)
 			return nil
-		}
 
-		if err != nil || n != STREAM_MSG_HEAD_LENGTH {
-			//todo: 错误处理
+		case err != nil || n != STREAM_MSG_HEAD_LENGTH:
 			log.Errorf("read data failed, err: %v", err)
+			self.CbCleanSession(self.needToCleanSessionsId, true)
 			return err
+
 		}
 
-		//转换为长度
-
-		var length int
+		//解出长度
+		length := binary.LittleEndian.Uint16(data)
 		data = make([]byte, length)
 		n, err = io.ReadFull(&self.conn, data)
-		if err != nil || n != STREAM_MSG_HEAD_LENGTH {
+		if err != nil || n != int(length) {
 			//todo: 错误处理
 			log.Errorf("read data failed, err: %v", err)
+			self.CbCleanSession(self.needToCleanSessionsId, true)
 			return err
 		}
 
@@ -101,24 +82,30 @@ func (self *TcpSession) Start() error {
 
 func (self *TcpSession) Send(data []byte) error {
 
+	//添加length
+	length := len(data)
+	sendData := make([]byte, length+STREAM_MSG_HEAD_LENGTH)
+	binary.LittleEndian.PutUint16(sendData, uint16(length))
+	copy(sendData[STREAM_MSG_HEAD_LENGTH:], data)
+
 	for {
-		n, err := self.conn.Write(data)
+		n, err := self.conn.Write(sendData)
 		if err != nil {
-			log.Errorf("send data failed, err: %v", err)
+			log.Errorf("send sendData failed, err: %v", err)
 			return err
 		}
 
-		if n == len(data) {
+		if n == len(sendData) {
 			break
 		}
 
-		data = data[n:]
+		sendData = sendData[n:]
 	}
 
 	return nil
 }
 
-func (self *TcpSession) Close() error {
+func (self *TcpSession) ClosePassive() error {
 
 	if atomic.CompareAndSwapInt32(&self.closeTag, 0, 1) {
 		err := self.conn.Close()
@@ -127,6 +114,6 @@ func (self *TcpSession) Close() error {
 	return nil
 }
 
-func (self *TcpSession) GetSessionId() string {
-	return self.sessionId
+func (self *TcpSession) CloseInitiative() error {
+	return self.ClosePassive()
 }

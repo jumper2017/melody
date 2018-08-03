@@ -2,7 +2,6 @@ package conn
 
 import (
 	"errors"
-	"net"
 
 	"sync/atomic"
 
@@ -11,49 +10,28 @@ import (
 )
 
 type WsSession struct {
-	conn        websocket.Conn
-	sessionId   string      //会话id
-	sessionType SessionType //服务端还是客户端
-	localAddr   net.Addr    //本端地址
-	remoteAddr  net.Addr    //对端地址
-
-	recvChan chan interface{} //接收数据的放置通道
-
-	CbCleanSession func([]string) error //关闭链接的回调函数，　由上层sessionManager进行操作
-
-	closeTag int32 //关闭动作标记
-
-	//todo: 根据业务需求进行设置，　默认在创建时设置为自身sessionId
-	needToCleanSessionsId []string
+	conn     websocket.Conn
+	recvChan chan []byte //接收数据的放置通道
+	BaseSession
 }
 
-func NewWsSession(sessionId string, sessionType SessionType, conn websocket.Conn, recvChan chan interface{}) (*WsSession, error) {
+func NewWsSession(sessionType SessionType, conn websocket.Conn, recvChan chan []byte) (*WsSession, error) {
 
 	laddr := conn.LocalAddr()
 	raddr := conn.RemoteAddr()
 	wsSession := &WsSession{
-		sessionId:             sessionId,
-		sessionType:           sessionType,
-		conn:                  conn,
-		localAddr:             laddr,
-		remoteAddr:            raddr,
-		recvChan:              recvChan,
-		closeTag:              0,
-		needToCleanSessionsId: []string{sessionId},
+
+		BaseSession: BaseSession{
+			sessionType: sessionType,
+			localAddr:   laddr,
+			remoteAddr:  raddr,
+			closeTag:    0,
+		},
+		conn:     conn,
+		recvChan: recvChan,
 	}
 
 	return wsSession, nil
-}
-
-func (self *WsSession) SetCbCleanSession(CbCleanSession func([]string) error) error {
-	if CbCleanSession != nil {
-		log.Errorf("set cb clean session failed, invalid param.")
-		return errors.New("set cb clean session failed, invalid param.")
-	}
-
-	self.CbCleanSession = CbCleanSession
-	return nil
-
 }
 
 func (self *WsSession) Start() error {
@@ -67,30 +45,29 @@ func (self *WsSession) Start() error {
 			return nil
 		}
 
-		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+		switch {
+
+		case websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway):
 			log.Debugf("recv eof from remote.")
-			self.CbCleanSession(self.needToCleanSessionsId)
+			self.CbCleanSession(self.needToCleanSessionsId, false)
 			return nil
-		}
 
-		if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+		case websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway):
 			log.Debugf("recv err eof from remote, %v", err)
-			self.CbCleanSession(self.needToCleanSessionsId)
+			self.CbCleanSession(self.needToCleanSessionsId, false)
 			return errors.New("recv err eof from remote")
-		}
 
-		if err != nil {
+		case err != nil:
 			log.Errorf("read msg failed, err: %v", err)
 			self.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseAbnormalClosure, "server close connection."))
-			self.CbCleanSession(self.needToCleanSessionsId)
+			self.CbCleanSession(self.needToCleanSessionsId, true)
 			return errors.New("read msg failed")
-		}
 
-		//todo: 根据业务需求进行修改，　在对端不是使用该golang库的情况下，不需要进行如下判断
-		if msgType != websocket.BinaryMessage {
+			//todo: 根据业务需求进行修改，　在对端不是使用该golang库的情况下，不需要进行如下判断
+		case msgType != websocket.BinaryMessage:
 			log.Errorf("invalid msg type: %v", msgType)
 			self.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseProtocolError, "server close connection."))
-			self.CbCleanSession(self.needToCleanSessionsId)
+			self.CbCleanSession(self.needToCleanSessionsId, true)
 			return errors.New("invalid msg type")
 		}
 
@@ -103,12 +80,10 @@ func (self *WsSession) Start() error {
 
 func (self *WsSession) Send(data []byte) error {
 
-	//todo: 根据业务需求进行修改
-	self.conn.WriteMessage(websocket.BinaryMessage, data)
-	return nil
+	return self.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
-func (self *WsSession) Close() error {
+func (self *WsSession) ClosePassive() error {
 
 	if atomic.CompareAndSwapInt32(&self.closeTag, 0, 1) {
 		err := self.conn.Close()
@@ -121,6 +96,6 @@ func (self *WsSession) Close() error {
 
 }
 
-func (self *WsSession) GetSessionId() string {
-	return self.sessionId
+func (self *WsSession) CloseInitiative() error {
+	return self.ClosePassive()
 }

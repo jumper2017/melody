@@ -8,8 +8,11 @@ import (
 
 	"net"
 
+	"fmt"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
+	"github.com/jumper2017/melody/network/conn/proto"
 	"github.com/jumper2017/melody/network/interf"
 )
 
@@ -24,7 +27,8 @@ type SessionManager struct {
 	// "gate:mahjong/0"表示sessionID, 即链接gate和mahjong的链接的index 0 的session
 	sessions     map[string][]interf.Session
 	sessionsLock sync.Mutex
-	recvChan     chan interface{}
+
+	recvChan chan []byte
 }
 
 // sessionID 为 "module_name_src:module_name_dst/1" 表示删除 module_name_src:module_name_dst 的第二个元素，
@@ -34,22 +38,27 @@ type SessionManager struct {
 
 //session 需要在　client/server　两端进行接口的统一，　因为某些逻辑在 client/server两端是存在差异的，　因此在session内部应该知道自己
 //是服务端还是客户端
-func NewSession(sessionId string, sessionType SessionType, conn interface{}, recvChan chan interface{}) (interf.Session, error) {
+func NewSession(sessionType SessionType, conn interface{}, recvChan chan []byte) (interf.Session, error) {
 
 	var session interf.Session
 	var err error
 	switch t := conn.(type) {
 	case net.TCPConn:
-		session, err = NewTcpSession(sessionId, sessionType, t, recvChan)
-		break
-
-	case net.UDPConn:
-		session, err = NewUdpSession(sessionId, sessionType, t, recvChan)
+		session, err = NewTcpSession(sessionType, t, recvChan)
 		break
 
 	case websocket.Conn:
-		session, err = NewWsSession(sessionId, sessionType, t, recvChan)
+		session, err = NewWsSession(sessionType, t, recvChan)
 		break
+
+	case proto.GrpcBid_CommServer:
+		session, err = NewGBSSession(sessionType, t, recvChan)
+		break
+
+	case net.UDPConn:
+		session, err = NewUdpSession(sessionType, t, recvChan)
+		break
+
 	default:
 		session, err = nil, nil
 		break
@@ -74,6 +83,8 @@ func (self *SessionManager) AddSession(sessionId string, s interf.Session) error
 	}
 
 	s.SetCbCleanSession(self.CleanSession)
+	newSessionId := fmt.Sprintf("%s/%d", sessionId, len(self.sessions[sessionId])-1)
+	s.SetSessionId(newSessionId)
 
 	return nil
 }
@@ -141,10 +152,10 @@ func (self *SessionManager) CloseSession(sessionID string) error {
 	self.sessionsLock.Lock()
 	defer self.sessionsLock.Unlock()
 
-	return self.closeSessionWithoutLock(sessionID)
+	return self.closeSessionWithoutLock(sessionID, true)
 }
 
-func (self *SessionManager) closeSessionWithoutLock(sessionID string) error {
+func (self *SessionManager) closeSessionWithoutLock(sessionID string, method bool) error {
 
 	sname := strings.Split(sessionID, "/")
 	if len(sname) != 2 {
@@ -153,7 +164,11 @@ func (self *SessionManager) closeSessionWithoutLock(sessionID string) error {
 
 	if sname[1] == "*" {
 		for _, v := range self.sessions[sname[0]] {
-			v.Close()
+			if !method {
+				v.ClosePassive()
+			} else {
+				v.CloseInitiative()
+			}
 		}
 		return nil
 	} else {
@@ -161,7 +176,12 @@ func (self *SessionManager) closeSessionWithoutLock(sessionID string) error {
 		if err != nil {
 			return err
 		}
-		self.sessions[sname[0]][index].Close()
+
+		if !method {
+			self.sessions[sname[0]][index].ClosePassive()
+		} else {
+			self.sessions[sname[0]][index].CloseInitiative()
+		}
 		return nil
 	}
 
@@ -173,7 +193,7 @@ func (self *SessionManager) closeSessionWithoutLock(sessionID string) error {
 //2. 一个链接关闭，需要关闭sessionManager下的所有其他链接，（比如client链接关闭了，此时需要关闭gate-room链接以及gate-xxx链接）
 //3. 一个链接关闭，需要关闭sessionManager下的部分链接，因此需要指定需要关闭的链接的sessionId
 //上述3种需求可以统一为一个接口
-func (self *SessionManager) CleanSession(sessionIds []string) error {
+func (self *SessionManager) CleanSession(sessionIds []string, method bool) error {
 	//sessionIds 可能取值：
 	// 1. 一个需要关闭的sessionId, 即底层调用该回调函数的session, 如 gate:mahjong/0
 	// 2. "all" 表示关闭所有链接
@@ -189,12 +209,12 @@ func (self *SessionManager) CleanSession(sessionIds []string) error {
 
 	if len(sessionIds) == 1 && sessionIds[0] == "all" {
 		for k := range self.sessions {
-			self.closeSessionWithoutLock(k + "/*")
+			self.closeSessionWithoutLock(k+"/*", method)
 			self.delSessionWithoutLock(k + "/*")
 		}
 	} else {
 		for _, v := range sessionIds {
-			self.closeSessionWithoutLock(v)
+			self.closeSessionWithoutLock(v, method)
 			self.delSessionWithoutLock(v)
 		}
 	}

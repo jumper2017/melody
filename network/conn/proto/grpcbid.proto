@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package proto;
+
+service GrpcBid {
+        rpc Comm(stream GrpcBidReq) returns (stream GrpcBidRsp) {}
+}
+
+
+
+//这里定义一个双向的服务， 通过用户名称来查询用户年纪
+message GrpcBidReq{
+        bytes req = 1;
+}
+
+message GrpcBidRsp{
+        bytes rsp = 1;
+}
