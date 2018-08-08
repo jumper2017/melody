@@ -10,12 +10,12 @@ import (
 )
 
 type WsSession struct {
-	conn     websocket.Conn
+	conn     *websocket.Conn
 	recvChan chan []byte //接收数据的放置通道
 	BaseSession
 }
 
-func NewWsSession(sessionType SessionType, conn websocket.Conn, recvChan chan []byte) (*WsSession, error) {
+func NewWsSession(sessionType SessionType, conn *websocket.Conn, recvChan chan []byte) (*WsSession, error) {
 
 	laddr := conn.LocalAddr()
 	raddr := conn.RemoteAddr()

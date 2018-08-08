@@ -31,14 +31,15 @@ package interf
 //Agent 用于表示一个用户对象， 包含该用户的session manager
 
 type PeerAcceptor interface {
-	Start(addr string)
-	Stop() bool
 	//接收到一个链接请求之后， 会创建一个session，
 	// 调用f以便将session 传入到对应的agent中
-	RegisterGenerateSession(f func(s Session))
+	RegisterGenerateSession(f func(sessionName string, s Session))
+	Start(sessionName string, listenAddr string, recvChan chan []byte)
+	Stop() bool
 }
 
 type PeerConnector interface {
+	RegisterGenerateSession(f func(sessionName string, s Session))
 	// 通过主动链接获得session之后， 存放到agent 的 session manager 中
-	Start(addr string) Session
+	Start(sessionName string, connAddr string, recvChan chan []byte)
 }

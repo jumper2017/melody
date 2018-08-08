@@ -36,7 +36,7 @@ func NewGBCSession(sessionType SessionType, conn proto.GrpcBid_CommClient, recvC
 		remoteGbaddr.addr = raddr[0]
 	}
 
-	grpcBidSSession := &GrpcBidCSession{
+	grpcBidCSession := &GrpcBidCSession{
 		BaseSession: BaseSession{
 			sessionType: sessionType,
 			localAddr:   localGbaddr,
@@ -47,7 +47,7 @@ func NewGBCSession(sessionType SessionType, conn proto.GrpcBid_CommClient, recvC
 		recvChan: recvChan,
 	}
 
-	return grpcBidSSession, nil
+	return grpcBidCSession, nil
 }
 
 func (self *GrpcBidCSession) SetCbCleanSession(CbCleanSession func([]string, bool) error) error {

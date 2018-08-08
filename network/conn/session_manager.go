@@ -43,11 +43,11 @@ func NewSession(sessionType SessionType, conn interface{}, recvChan chan []byte)
 	var session interf.Session
 	var err error
 	switch t := conn.(type) {
-	case net.TCPConn:
+	case *net.TCPConn:
 		session, err = NewTcpSession(sessionType, t, recvChan)
 		break
 
-	case websocket.Conn:
+	case *websocket.Conn:
 		session, err = NewWsSession(sessionType, t, recvChan)
 		break
 
@@ -55,9 +55,13 @@ func NewSession(sessionType SessionType, conn interface{}, recvChan chan []byte)
 		session, err = NewGBSSession(sessionType, t, recvChan)
 		break
 
-	case net.UDPConn:
-		session, err = NewUdpSession(sessionType, t, recvChan)
+	case proto.GrpcBid_CommClient:
+		session, err = NewGBCSession(sessionType, t, recvChan)
 		break
+
+	//case net.UDPConn:
+	//	session, err = NewUdpSession(sessionType, t, recvChan)
+	//	break
 
 	default:
 		session, err = nil, nil
@@ -74,7 +78,6 @@ func (self *SessionManager) AddSession(sessionId string, s interf.Session) error
 	}
 
 	self.sessionsLock.Lock()
-	defer self.sessionsLock.Unlock()
 
 	if slice, ok := self.sessions[sessionId]; ok {
 		slice = append(slice, s)
@@ -85,6 +88,11 @@ func (self *SessionManager) AddSession(sessionId string, s interf.Session) error
 	s.SetCbCleanSession(self.CleanSession)
 	newSessionId := fmt.Sprintf("%s/%d", sessionId, len(self.sessions[sessionId])-1)
 	s.SetSessionId(newSessionId)
+
+	self.sessionsLock.Unlock()
+
+	//启动session, 该函数阻塞
+	s.Start()
 
 	return nil
 }

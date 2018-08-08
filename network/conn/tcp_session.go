@@ -12,12 +12,12 @@ import (
 )
 
 type TcpSession struct {
-	conn     net.TCPConn
+	conn     *net.TCPConn
 	recvChan chan []byte //接收数据的放置通道
 	BaseSession
 }
 
-func NewTcpSession(sessionType SessionType, conn net.TCPConn, recvChan chan []byte) (*TcpSession, error) {
+func NewTcpSession(sessionType SessionType, conn *net.TCPConn, recvChan chan []byte) (*TcpSession, error) {
 
 	laddr := conn.LocalAddr()
 	raddr := conn.RemoteAddr()
@@ -41,7 +41,7 @@ func (self *TcpSession) Start() error {
 	for {
 
 		data := make([]byte, STREAM_MSG_HEAD_LENGTH)
-		n, err := io.ReadFull(&self.conn, data)
+		n, err := io.ReadFull(self.conn, data)
 
 		if atomic.LoadInt32(&self.closeTag) == 1 {
 			log.Debugf("close tag is 1, return func.")
@@ -65,7 +65,7 @@ func (self *TcpSession) Start() error {
 		//解出长度
 		length := binary.LittleEndian.Uint16(data)
 		data = make([]byte, length)
-		n, err = io.ReadFull(&self.conn, data)
+		n, err = io.ReadFull(self.conn, data)
 		if err != nil || n != int(length) {
 			//todo: 错误处理
 			log.Errorf("read data failed, err: %v", err)

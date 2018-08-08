@@ -5,8 +5,9 @@ import (
 	//"components/package/encrypt"
 	//"fmt"
 	//"components/package/packet"
-	"components/package_v_1_0/package_op"
 	"fmt"
+
+	"github.com/jumper2017/melody/package/package_op"
 )
 
 func main() {
