@@ -10,6 +10,7 @@ import (
 )
 
 //用于监听目录
+//func WatchWithPassword(serverAddr []string, dir string, user string, password string, putFunc func(in interface{}) interface{}, delFunc func(in interface{}) interface{}) error {
 func WatchWithPassword(serverAddr []string, dir string, user string, password string) error {
 
 	cli, err := clientv3.New(clientv3.Config{
@@ -23,10 +24,12 @@ func WatchWithPassword(serverAddr []string, dir string, user string, password st
 	}
 	defer cli.Close()
 
+	//watch(cli, dir, putFunc, delFunc)
 	watch(cli, dir)
 	return nil
 }
 
+//func WatchWithoutPassword(serverAddr []string, dir string, putFunc func(in interface{}) interface{}, delFunc func(in interface{}) interface{}) error {
 func WatchWithoutPassword(serverAddr []string, dir string) error {
 
 	cli, err := clientv3.New(clientv3.Config{
@@ -39,10 +42,12 @@ func WatchWithoutPassword(serverAddr []string, dir string) error {
 	}
 	defer cli.Close()
 
+	//watch(cli, dir, putFunc, delFunc)
 	watch(cli, dir)
 	return nil
 }
 
+//func watch(cli *clientv3.Client, dir string, putFunc func(in interface{}) interface{}, delFunc func(in interface{}) interface{}) {
 func watch(cli *clientv3.Client, dir string) {
 
 	//初始化server_pool, 获得最新版本号
@@ -77,11 +82,13 @@ func watch(cli *clientv3.Client, dir string) {
 				//logrus.Debugf("put event, info: %v", e.Kv)
 				fmt.Printf("put event, info: %v\n", e.Kv)
 				serverPool.servers[string(e.Kv.Key)] = string(e.Kv.Value)
+				//putFunc([]string{string(e.Kv.Key), string(e.Kv.Value)})
 				break
 			case mvccpb.DELETE:
 				//logrus.Debugf("delete event, info: %v", e.Kv)
 				fmt.Printf("delete event, info: %v\n", e.Kv)
 				delete(serverPool.servers, string(e.Kv.Key))
+				//delFunc([]string{string(e.Kv.Key), string(e.Kv.Value)})
 				break
 			}
 			serverPool.Unlock()
