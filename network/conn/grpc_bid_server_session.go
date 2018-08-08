@@ -1,8 +1,6 @@
 package conn
 
 import (
-	"errors"
-
 	"io"
 
 	log "github.com/Sirupsen/logrus"
@@ -66,17 +64,6 @@ func NewGBSSession(sessionType SessionType, conn proto.GrpcBid_CommServer, recvC
 	return grpcBidSSession, nil
 }
 
-func (self *GrpcBidSSession) SetCbCleanSession(CbCleanSession func([]string, bool) error) error {
-	if CbCleanSession != nil {
-		log.Errorf("set cb clean session failed, invalid param.")
-		return errors.New("set cb clean session failed, invalid param.")
-	}
-
-	self.CbCleanSession = CbCleanSession
-	return nil
-
-}
-
 func (self *GrpcBidSSession) Start() error {
 
 	for {
@@ -130,14 +117,4 @@ func (self *GrpcBidSSession) CloseInitiative() error {
 	//todo: 发送 kick 消息给客户端， 让其关闭链接
 
 	return nil
-}
-
-func (self *GrpcBidSSession) GetSessionId() string {
-	return self.sessionId
-}
-
-func (self *GrpcBidSSession) SetSessionId(sessionId string) {
-	self.sessionId = sessionId
-	self.needToCleanSessionsId = []string{sessionId}
-	return
 }

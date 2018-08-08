@@ -1,7 +1,6 @@
 package conn
 
 import (
-	"errors"
 	"io"
 
 	log "github.com/Sirupsen/logrus"
@@ -50,17 +49,6 @@ func NewGBCSession(sessionType SessionType, conn proto.GrpcBid_CommClient, recvC
 	return grpcBidCSession, nil
 }
 
-func (self *GrpcBidCSession) SetCbCleanSession(CbCleanSession func([]string, bool) error) error {
-	if CbCleanSession != nil {
-		log.Errorf("set cb clean session failed, invalid param.")
-		return errors.New("set cb clean session failed, invalid param.")
-	}
-
-	self.CbCleanSession = CbCleanSession
-	return nil
-
-}
-
 func (self *GrpcBidCSession) Start() error {
 
 	for {
@@ -80,9 +68,10 @@ func (self *GrpcBidCSession) Start() error {
 			return nil
 
 		case err != nil:
+			//当server端挂掉之后， 此时client recv会立即返回 err: transport is closing, 这里收到错误直接closeSend之后 退出
 			log.Errorf("read data failed, err: %v", err)
 			self.CbCleanSession(self.needToCleanSessionsId, true)
-			continue
+			return nil
 
 		}
 
@@ -113,14 +102,4 @@ func (self *GrpcBidCSession) ClosePassive() error {
 func (self *GrpcBidCSession) CloseInitiative() error {
 
 	return self.conn.CloseSend()
-}
-
-func (self *GrpcBidCSession) GetSessionId() string {
-	return self.sessionId
-}
-
-func (self *GrpcBidCSession) SetSessionId(sessionId string) {
-	self.sessionId = sessionId
-	self.needToCleanSessionsId = []string{sessionId}
-	return
 }

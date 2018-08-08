@@ -88,6 +88,7 @@ func (self *GrpcPeerAcceptor) Stop() bool {
 type GrpcPeerConnector struct {
 	// 通过主动链接获得session之后， 存放到agent 的 session manager 中
 	funcAddSession func(sessionName string, s interf.Session)
+	cli            *grpc.ClientConn
 }
 
 func (self *GrpcPeerConnector) RegisterGenerateSession(f func(sessionName string, s interf.Session)) {
@@ -100,13 +101,17 @@ func (self *GrpcPeerConnector) RegisterGenerateSession(f func(sessionName string
 
 func (self *GrpcPeerConnector) Start(sessionName string, connAddr string, recvChan chan []byte) {
 
-	cli, err := grpc.Dial(connAddr, grpc.WithInsecure())
-	if err != nil {
-		fmt.Println("dial failed, err:", err)
-		return
+	//建立一个链接, 之后都是在该链接上创建流 来进行通信
+	if self.cli == nil {
+		var err error
+		self.cli, err = grpc.Dial(connAddr, grpc.WithInsecure())
+		if err != nil {
+			fmt.Println("dial failed, err:", err)
+			return
+		}
 	}
 
-	conn := proto.NewGrpcBidClient(cli)
+	conn := proto.NewGrpcBidClient(self.cli)
 
 	grpccSession, err := NewSession(ClientSession, conn.(proto.GrpcBid_CommClient), recvChan)
 	if err != nil {
