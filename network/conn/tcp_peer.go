@@ -62,19 +62,21 @@ func (self *TcpPeerAcceptor) Stop() bool {
 type TcpPeerConnector struct {
 	// 通过主动链接获得session之后， 存放到agent 的 session manager 中
 	funcAddSession func(sessionName string, s interf.Session)
+	connAddr       string
 }
 
-func (self *TcpPeerConnector) RegisterGenerateSession(f func(sessionName string, s interf.Session)) {
+func (self *TcpPeerConnector) InitConn(connAddr string, f func(sessionName string, s interf.Session)) {
 	if f == nil {
 		panic("register generate session failed, invalid param.")
 	}
+	self.connAddr = connAddr
 	self.funcAddSession = f
 	return
 }
 
-func (self *TcpPeerConnector) Start(sessionName string, connAddr string, recvChan chan []byte) {
+func (self *TcpPeerConnector) Start(sessionName string, recvChan chan []byte) {
 
-	conn, err := net.Dial("tcp", connAddr)
+	conn, err := net.Dial("tcp", self.connAddr)
 	if err != nil {
 		fmt.Println("err:", err)
 		return

@@ -89,26 +89,36 @@ type GrpcPeerConnector struct {
 	// 通过主动链接获得session之后， 存放到agent 的 session manager 中
 	funcAddSession func(sessionName string, s interf.Session)
 	cli            *grpc.ClientConn
+	connAddr       string
 }
 
-func (self *GrpcPeerConnector) RegisterGenerateSession(f func(sessionName string, s interf.Session)) {
+func (self *GrpcPeerConnector) InitConn(connAddr string, f func(sessionName string, s interf.Session)) {
 	if f == nil {
 		panic("register generate session failed, invalid param.")
 	}
 	self.funcAddSession = f
-	return
-}
+	self.connAddr = connAddr
 
-func (self *GrpcPeerConnector) Start(sessionName string, connAddr string, recvChan chan []byte) {
-
-	//建立一个链接, 之后都是在该链接上创建流 来进行通信
 	if self.cli == nil {
 		var err error
 		self.cli, err = grpc.Dial(connAddr, grpc.WithInsecure())
 		if err != nil {
-			fmt.Println("dial failed, err:", err)
+			panic("dial failed")
 			return
 		}
+	} else {
+		fmt.Println("valid cli, don't call InitConn, ")
+		return
+	}
+}
+
+func (self *GrpcPeerConnector) Start(sessionName string, recvChan chan []byte) {
+
+	//建立一个链接, 之后都是在该链接上创建流 来进行通信
+	//与tcp ws 很大不同
+	if self.cli == nil {
+		fmt.Println("invalid cli, do call InitConn")
+		return
 	}
 
 	conn := proto.NewGrpcBidClient(self.cli)

@@ -39,7 +39,7 @@ type PeerAcceptor interface {
 }
 
 type PeerConnector interface {
-	RegisterGenerateSession(f func(sessionName string, s Session))
+	InitConn(connAddr string, f func(sessionName string, s Session))
 	// 通过主动链接获得session之后， 存放到agent 的 session manager 中
-	Start(sessionName string, connAddr string, recvChan chan []byte)
+	Start(sessionName string, recvChan chan []byte)
 }

@@ -69,19 +69,21 @@ func (self *WsPeerAcceptor) Stop() bool {
 type WsPeerConnector struct {
 	// 通过主动链接获得session之后， 存放到agent 的 session manager 中
 	funcAddSession func(sessionName string, s interf.Session)
+	connAddr       string
 }
 
-func (self *WsPeerConnector) RegisterGenerateSession(f func(sessionName string, s interf.Session)) {
+func (self *WsPeerConnector) InitConn(connAddr string, f func(sessionName string, s interf.Session)) {
 	if f == nil {
 		panic("register generate session failed, invalid param.")
 	}
+	self.connAddr = connAddr
 	self.funcAddSession = f
 	return
 }
 
-func (self *WsPeerConnector) Start(sessionName string, connAddr string, recvChan chan []byte) {
+func (self *WsPeerConnector) Start(sessionName string, recvChan chan []byte) {
 
-	u := url.URL{Scheme: "ws", Host: connAddr, Path: "/ws"}
+	u := url.URL{Scheme: "ws", Host: self.connAddr, Path: "/ws"}
 	var dia websocket.Dialer
 	conn, _, err := dia.Dial(u.String(), nil)
 	if err != nil {
