@@ -9,9 +9,19 @@ import (
 	"github.com/jumper2017/melody/errdefine"
 )
 
+///////////////////////////////////////////////////////////////////////////////////////////
+//对于启动service / 关闭service 如何同步 service_pool 的说明
+//在应用层定义一个 service_conn 的map[string] peer ,
+//key为 peerName(即sessionName), value为 PeerConnector(即GrpcPeerConnector)
+//在watcher 中注入回调函数 defFunc 和 putFunc， 当加入新结点或者删除已有结点时，调用对应回调
+//回调函数中操作 service_conn (注意加锁) 新建peer, 或者删除peer
+
+//另外对于如何进行负载均衡，也是值得考虑的问题
+///////////////////////////////////////////////////////////////////////////////////////////
+
 type ServerPool struct {
 	servers map[string]string
-	sync.Mutex
+	sync.RWMutex
 }
 
 var serverPool ServerPool
@@ -36,8 +46,8 @@ func GetServiceInfoWithName(name string) (string, error) {
 		return "", errdefine.ERR_ETCD_INVALID_PARAM
 	}
 
-	serverPool.Lock()
-	defer serverPool.Unlock()
+	serverPool.RLock()
+	defer serverPool.RUnlock()
 
 	for k := range serverPool.servers {
 		if strings.HasSuffix(k, name) {
@@ -55,8 +65,8 @@ func GetServiceInfoWithTypeOne(typ string) (string, string, error) {
 		return "", "", errdefine.ERR_ETCD_INVALID_PARAM
 	}
 
-	serverPool.Lock()
-	defer serverPool.Unlock()
+	serverPool.RLock()
+	defer serverPool.RUnlock()
 
 	tmpKeys := make([]string, 0)
 
@@ -87,8 +97,8 @@ func GetServiceInfoWithTypeAll(typ string) (map[string]string, error) {
 		return nil, errdefine.ERR_ETCD_INVALID_PARAM
 	}
 
-	serverPool.Lock()
-	defer serverPool.Unlock()
+	serverPool.RLock()
+	defer serverPool.RUnlock()
 
 	tmpInfo := make(map[string]string)
 
